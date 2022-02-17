@@ -71,11 +71,5 @@ def get_grphc(date, data):
     return gr
 
 
-def get_xls():
-    with open('tmp/example.csv', 'rb') as fd:
-        data = fd.read()
-        return data
-
-
 def check_admin(uid):
     return True
