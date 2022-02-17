@@ -1,10 +1,11 @@
 from flask import Flask, request
 import service
-from io import *
-import pandas as pd
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite3:///C:/Users/Maxim/Desktop/ppo_it/database.db'
 
+db = SQLAlchemy(app)
 
 @app.route('/<sn>/<file_name>', methods=['POST'])
 def main(sn, file_name):
