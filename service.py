@@ -3,6 +3,8 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 
 res_data = []
+
+
 def parse_file(_file, sn, file_name):
     _file = _file.split(';')
     x = 26
@@ -36,7 +38,7 @@ def parse_file(_file, sn, file_name):
             mes_data.append(sn)
             global res_data
             res_data.append(mes_data)
-            res_data.sort(key= lambda x: x[0])
+            res_data.sort(key=lambda x: x[0])
 
 
 def format_date(data):
@@ -75,3 +77,5 @@ def get_xls():
         return data
 
 
+def check_admin(uid):
+    return True
