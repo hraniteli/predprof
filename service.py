@@ -1,6 +1,7 @@
 import csv
 from datetime import datetime
 import matplotlib.pyplot as plt
+from providers import *
 
 res_data = []
 
@@ -18,27 +19,12 @@ def parse_file(_file, sn, file_name):
     with open(file_name, 'r') as fd:
         reader = csv.reader(fd, delimiter=';')
         for row in reader:
-            mes_data = []
-            mes_data.append(format_date(row[0]))
-            mes_data.append(format_date(row[1]))
-            mes_data.append(float(row[11]))
-            mes_data.append(float(row[12]))
-            mes_data.append(float(row[13]))
-            mes_data.append(float(row[5]))
-            mes_data.append(float(row[6]))
-            mes_data.append(float(row[7]))
-            mes_data.append(float(row[8]))
-            mes_data.append(float(row[9]))
-            mes_data.append(float(row[10]))
-            if row[14]:
-                efficiency = calc_effeciency(row[5:8], row[17:20])
-                mes_data.append(efficiency)
-            else:
-                mes_data.append(None)
-            mes_data.append(sn)
-            global res_data
-            res_data.append(mes_data)
-            res_data.sort(key=lambda x: x[0])
+            efficiency = calc_effeciency(row[5:8], row[17:20]) if row[14] else 0 # Нужна ли еффективность если не производилось включение акэс?
+            add_data(sn=sn, t_start=format_date(row[0]), t_stop=format_date(row[1]), cos_a=float(row[11]),
+                     cos_b=float(row[12]), cos_c=float(row[13]),
+                     p_a=float(row[5]),
+                     p_b=float(row[6]), p_c=float(row[7]), q_a=float(row[2]), q_b=float(row[3]), q_c=float(row[4]),
+                     ef=efficiency)
 
 
 def format_date(data):

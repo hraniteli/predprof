@@ -2,8 +2,9 @@ from main import db
 
 
 class Data(db.Model):
+    __tablename__ = 'data'
     id = db.Column(db.Integer(), primary_key=True)
-    sn = db.Column(db.Integer(), db.ForgeignKey('akes.sn'), nullable=False)
+    sn = db.Column(db.Integer(), db.ForeignKey('akes.sn'), nullable=False)
     t_start = db.Column(db.DateTime(), nullable=False)
     t_stop = db.Column(db.DateTime(), nullable=False)
     cos_a = db.Column(db.Float(), nullable=False)
@@ -30,7 +31,12 @@ class Akes(db.Model):
     user_uid = db.relationship('User', secondary=user_akes, backref='akes')
     data = db.relationship('Data', backref='akes')
 
+
 class User(db.Model):
     __tablename__ = 'users'
     uid = db.Column(db.Integer(), primary_key=True)
     admin = db.Column(db.Boolean(), nullable=False)
+
+
+if len(db.engine.table_names()) == 0:
+    db.create_all()
