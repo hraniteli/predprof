@@ -2,58 +2,131 @@ import telebot
 from telebot import types
 import service
 import datetime
-from providers import get_data, add_user_in_db, add_user_to_akes
+from providers import *
 import re
+import csv
+from config import TOKEN
+from pandas import read_csv
 
-TOKEN = '5283098146:AAH3C8OszNaXw3jJL7TjSPF8Zty2fq2PTRg'
 bot = telebot.TeleBot(TOKEN)
-res_data = [[datetime.datetime(2022, 2, 16, 14, 0, 2), datetime.datetime(2022, 2, 16, 14, 6, 13), 0.997, 0.999, 0.999,
-             89400.0, 84300.0, 81600.0, 230.0, 231.0, 227.0, 7.51, '800000005773'],
-            [datetime.datetime(2022, 2, 16, 19, 7, 22), datetime.datetime(2022, 2, 16, 19, 7, 22), -0.999, 0.999,
-             -0.975, 17100.0, 17400.0, 20400.0, 231.0, 229.0, 230.0, None, '800000005773'],
-            [datetime.datetime(2022, 2, 16, 20, 7, 34), datetime.datetime(2022, 2, 16, 20, 7, 34), 0.999, -0.994,
-             -0.993, 8400.0, 9000.0, 12000.0, 231.0, 231.0, 230.0, None, '800000005773'],
-            [datetime.datetime(2022, 2, 16, 18, 15, 30), datetime.datetime(2022, 2, 16, 20, 21, 30), -0.966, -0.968,
-             -0.965, 18486.0, 16380.0, 13530.0, 224.42, 224.07, 224.42, 21.97, '800000005773']]
+
+
+def check_admin(func):
+    def wrapper(message):
+        check = check_user_admin(message.chat.id)
+        if check == 'Пользователь не найден.':
+            bot.send_message(message.chat.id,
+                             'Вы не зарегистрированы. Обратитесь к администратору, чтобы она вас зарегестрировал.')
+            return 0
+        if check:
+            func(message)
+        else:
+            bot.send_message(message.chat.id, 'У вас недостаточно прав.')
+
+    return wrapper
+
+
+def check_user(func):
+    def wrapper(message):
+        check = check_user_exist(message.chat.id)
+        if check == 'Пользователь не найден.':
+            bot.send_message(message.chat.id,
+                             'Вы не зарегистрированы. Обратитесь к администратору, чтобы она вас зарегестрировал.')
+            return 0
+        if check:
+            func(message)
+
+    return wrapper
 
 
 @bot.message_handler(commands=['xls'])
+@check_user
 def get_xls(message):
-    with open('tmp/example.csv', 'rb') as fd:
+    msg = bot.send_message(message.chat.id, 'Введите серийный номер АКЭС.')
+    bot.register_next_step_handler(msg, get_xls_by_sn)
+
+
+def get_xls_by_sn(message):
+    if len(re.findall('\D', message.text.strip())) > 0:
+        bot.send_message(message.chat.id, 'Недопустимый формат серийного номера.')
+        return 0
+    sn = int(message.text.strip())
+    data = get_data(sn, message)
+    if data == 'Нет АКЭС':
+        bot.send_message(message.chat.id, 'АКЭС не существует.')
+        return 0
+    if data == 'Нет доступа':
+        bot.send_message(message.chat.id, 'У вас не досткпа к этому АКЭС.')
+        return 0
+    res = []
+    for d in data:
+        res.append([
+            d.t_start,
+            d.t_stop,
+            d.cos_a,
+            d.cos_b,
+            d.cos_c,
+            d.p_a,
+            d.p_b,
+            d.p_c,
+            d.q_a,
+            d.q_b,
+            d.q_c,
+            str(d.ef).replace('.', ',') + '%'
+        ])
+    with open('tmp/data.csv', 'w') as f:
+        writer = csv.writer(f, delimiter=';', lineterminator='\n')
+        writer.writerows(res)
+    with open('tmp/data.csv', 'r') as fd:
         bot.send_document(message.chat.id, fd)
 
 
 @bot.message_handler(commands=['grphc'])
+@check_user
 def get_grphc(message):
+    msg = bot.send_message(message.chat.id, 'Введите серийный номер АКЭС.')
+    bot.register_next_step_handler(msg, grphc_period)
+
+
+def grphc_period(message):
+    if len(re.findall('\D', message.text.strip())) > 0:
+        bot.send_message(message.chat.id, 'Недопустимый формат серийного номера.')
+        return 0
+    sn = int(message.text.strip())
+    if not check_akes(sn):
+        bot.send_message(message.chat.id, 'АКЭС не существует.')
+        return 0
     keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton(text='За этот день', callback_data='get_grphc_day'))
-    keyboard.add(types.InlineKeyboardButton(text='За неделю', callback_data='get_grphc_week'))
+    keyboard.add(types.InlineKeyboardButton(text='За этот день', callback_data=f'get_grphc_day {sn}'))
+    keyboard.add(types.InlineKeyboardButton(text='За неделю', callback_data=f'get_grphc_week {sn}'))
     bot.send_message(message.chat.id, 'За какой период?', reply_markup=keyboard)
 
 
 @bot.message_handler(commands=['add_user'])
+@check_admin
 def add_user(message):
-    if service.check_admin(message.chat.id):
-        msg = bot.send_message(message.chat.id, 'Укажите uid')
+    if check_admin(message.chat.id):
+        msg = bot.send_message(message.chat.id, 'Укажите uid.')
         bot.register_next_step_handler(msg, add_user_handler)
 
 
 def add_user_handler(message):
     if len(re.findall('\D+', message.text.strip())) != 0:
-        bot.send_message(message.chat.id, 'Недопустимый формат uid')
+        bot.send_message(message.chat.id, 'Недопустимый формат uid.')
         return 0
     uid = message.text.strip()
     user = add_user_in_db(uid)
     if user == 0:
-        bot.send_message(message.chat.id, 'Такой пользователь уже есть')
+        bot.send_message(message.chat.id, 'Такой пользователь уже есть.')
     else:
-        bot.send_message(message.chat.id, 'Готово')
+        bot.send_message(message.chat.id, 'Готово!')
 
 
 @bot.message_handler(commands=['add_akes'])
+@check_admin
 def add_akes(message):
     msg = bot.send_message(message.chat.id,
-                           'Введите uid пользователя и серийный номер АКЭС, к которому надо выдать доступ')
+                           'Введите uid пользователя и серийный номер АКЭС, к которому надо выдать доступ.')
     bot.register_next_step_handler(msg, add_akes_handler)
 
 
@@ -67,25 +140,66 @@ def add_akes_handler(message):
             check = False
             break
     if not check:
-        bot.send_message(message.chat.id, 'Недопустимый формат uid или серийного номера')
+        bot.send_message(message.chat.id, 'Недопустимый формат uid или серийного номера.')
         return 0
     uid, sn = re.findall('\d+', message.text)
-    akes = add_user_to_akes(uid, sn)
+    akes = add_user_to_akes(uid, int(sn))
     if akes == 0:
-        bot.send_message(message.chat.id, 'У пользователя уже есть достуа к этой АКЭС')
+        bot.send_message(message.chat.id, 'У пользователя уже есть достуа к этой АКЭС.')
+        return 0
     if akes == -1:
-        bot.send_message(message.chat.id, 'АКЭС не существует')
-    else:
-        bot.send_message(message.chat.id, 'АКЭС добавлена')
+        bot.send_message(message.chat.id, 'АКЭС не существует.')
+        return 0
+    bot.send_message(message.chat.id, 'АКЭС добавлена.')
+
+
+@bot.message_handler(commands=['del_akes'])
+@check_admin
+def del_akes(message):
+    msg = bot.send_message(message.chat.id,
+                           'Введите uid пользователя и серийный номер АКЭС, к которому надо запретить доступ.')
+    bot.register_next_step_handler(msg, del_akes_handler)
+
+
+def del_akes_handler(message):
+    check = True
+    mes = re.findall('\S+', message.text)
+    if len(mes) != 2:
+        check = False
+    for x in [re.findall('\D+', x) for x in mes]:
+        if len(x) > 0:
+            check = False
+            break
+    if not check:
+        bot.send_message(message.chat.id, 'Недопустимый формат uid или серийного номера.')
+        return 0
+    uid, sn = re.findall('\d+', message.text)
+    akes = del_user_from_akes(uid, int(sn))
+    if akes == 0:
+        bot.send_message(message.chat.id, 'У пользователя и так нет достуа к этой АКЭС.')
+        return 0
+    if akes == -1:
+        bot.send_message(message.chat.id, 'АКЭС не существует.')
+        return 0
+    bot.send_message(message.chat.id, 'АКЭС удалена.')
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def query_handler(call):
-    if call.data == 'get_grphc_day':
-        data = get_data('day')
+    call_data, sn = call.data.split(' ')
+    sn = int(sn)
+    message = call.message
+    if call_data == 'get_grphc_day':
+        data = get_data(sn, message, 'day')
+        if data == 'Нет доступа':
+            bot.send_message(message.chat.id, 'У вас не досткпа к этому АКЭС.')
+            return 0
         answer = service.get_grphc(data)
-    if call.data == 'get_grphc_week':
-        data = get_data('week')
+    if call_data == 'get_grphc_week':
+        data = get_data(sn, message, 'week')
+        if data == 'Нет доступа':
+            bot.send_message(message.chat.id, 'У вас не досткпа к этому АКЭС.')
+            return 0
         answer = service.get_grphc(data)
     bot.send_photo(call.message.chat.id, answer)
     bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id)

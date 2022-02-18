@@ -3,6 +3,23 @@ from model import *
 from datetime import datetime
 
 
+def data_wrapper(func):
+    def wrapper(sn, message, date=None):
+        now = datetime.now()
+        if isinstance(func(sn, message), str):
+            return func(sn, message)
+        if date == 'day':
+            return func(sn, message, date).filter(now.replace(
+                hour=0, minute=0, second=0, microsecond=0) < Data.t_start).filter(Data.t_start < now).all()
+        if date == 'week':
+            return func(sn, message, date).filter(now.replace(
+                day=datetime.now().day - 7, hour=0, minute=0, second=0, microsecond=0) < Data.t_start).filter(
+                Data.t_start < datetime.now()).all()
+        return func(sn, message).all()
+
+    return wrapper
+
+
 def add_data(sn, t_start, t_stop, cos_a, cos_b, cos_c, p_a, p_b,
              p_c, q_a, q_b, q_c, ef):
     try:
@@ -22,14 +39,27 @@ def add_data(sn, t_start, t_stop, cos_a, cos_b, cos_c, p_a, p_b,
         db.session.rollback()
 
 
-def get_data(date):
-    now = datetime.now()
-    if date == 'day':
-        return Data.query.filter(now.replace(hour=0, minute=0, second=0,
-                                             microsecond=0) < Data.t_start).filter(Data.t_start < now).all()
-    return Data.query.filter(datetime.now().replace(day=datetime.now().day - 7, hour=0, minute=0, second=0,
-                                                    microsecond=0) < Data.t_start).filter(
-        Data.t_start < datetime.now()).all()
+@data_wrapper
+def get_data(sn, message, date=None):
+    if Akes.query.filter_by(sn=sn).first() is None:
+        return 'Нет АКЭС'
+    users_akes = User.query.get(message.chat.id).akes
+    if sn in [akes.sn for akes in users_akes]:
+        return Data.query.filter(sn == sn).filter(Data.ef != -1)
+    return 'Нет доступа'
+
+
+def check_user_exist(uid):
+    if User.query.filter_by(uid=uid).first() is None:
+        return 'Пользователь не найден.'
+    return True
+
+
+def check_user_admin(uid):
+    if check_user_exist(uid):
+        if User.query.filter_by(uid=uid).first().admin == 1:
+            return True
+        return False
 
 
 def add_user_in_db(uid):
@@ -42,9 +72,26 @@ def add_user_in_db(uid):
 
 
 def add_user_to_akes(uid, sn):
-    if Akes.query.filter_by(sn=sn).scalar() is None:
+    if Akes.query.get(sn) is None:
         return -1
     if sn in [akes.sn for akes in User.query.filter_by(uid=uid).first().akes]:
         return 0
     else:
         db.session.execute(user_akes.insert(), params={'user_uid': uid, 'akes_sn': sn})
+        db.session.commit()
+
+
+def del_user_from_akes(uid, sn):
+    if Akes.query.get(sn) is None:
+        return -1
+    if sn not in [akes.sn for akes in User.query.filter_by(uid=uid).first().akes]:
+        return 0
+    else:
+        db.session.execute(user_akes.delete(), params={'user_uid': uid, 'akes_sn': sn})
+        db.session.commit()
+
+
+def check_akes(sn):
+    if Akes.query.get(sn) is None:
+        return False
+    return True
