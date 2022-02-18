@@ -1,5 +1,4 @@
 import csv
-from datetime import datetime
 import matplotlib.pyplot as plt
 from providers import *
 
@@ -19,7 +18,8 @@ def parse_file(_file, sn, file_name):
     with open(file_name, 'r') as fd:
         reader = csv.reader(fd, delimiter=';')
         for row in reader:
-            efficiency = calc_effeciency(row[5:8], row[17:20]) if row[14] else 0 # Нужна ли еффективность если не производилось включение акэс?
+            efficiency = calc_efficiency(row[5:8], row[17:20]) if row[
+                14] else -1  # ?????
             add_data(sn=sn, t_start=format_date(row[0]), t_stop=format_date(row[1]), cos_a=float(row[11]),
                      cos_b=float(row[12]), cos_c=float(row[13]),
                      p_a=float(row[5]),
@@ -33,24 +33,17 @@ def format_date(data):
     return date
 
 
-def calc_effeciency(on, off):
+def calc_efficiency(on, off):
     sum_on = sum(map(float, on))
     sum_off = sum(map(float, off))
     efficiency = round(((sum_off - sum_on) / sum_off) * 100, 2)
     return efficiency
 
 
-def get_grphc(date, data):
-    call_data = list(
-        filter(lambda x: datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) < x[0] < datetime.now(),
-               data)) \
-        if date == 'day' else \
-        list(
-            filter(lambda x: datetime.now().replace(day=datetime.now().day - 7, hour=0, minute=0, second=0,
-                                                    microsecond=0) < x[0] < datetime.now(), data))
-    effeciency = [x[11] for x in call_data if x[11]]
-    date = [datetime.strftime(x[0], '%d.%m.%Y %H:%M:%S') for x in call_data if x[11]]
-    plt.plot(date, effeciency)
+def get_grphc(data):
+    efficiency = [x.ef for x in data if x.ef != -1]
+    date = [x.t_start for x in data if x.ef != -1]
+    plt.plot(date, efficiency)
     plt.savefig('tmp/test.png')
     with open('tmp/test.png', 'rb') as gr:
         gr = gr.read()

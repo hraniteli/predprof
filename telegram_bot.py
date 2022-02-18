@@ -2,6 +2,8 @@ import telebot
 from telebot import types
 import service
 import datetime
+from providers import get_data, add_user_in_db, add_user_to_akes
+import re
 
 TOKEN = '5283098146:AAH3C8OszNaXw3jJL7TjSPF8Zty2fq2PTRg'
 bot = telebot.TeleBot(TOKEN)
@@ -32,20 +34,59 @@ def get_grphc(message):
 @bot.message_handler(commands=['add_user'])
 def add_user(message):
     if service.check_admin(message.chat.id):
-        msg = bot.send_message(message.chat.id, 'Укажите uid и sn')
+        msg = bot.send_message(message.chat.id, 'Укажите uid')
         bot.register_next_step_handler(msg, add_user_handler)
 
 
 def add_user_handler(message):
-    bot.send_message(message.chat.id, 'Готово')
+    if len(re.findall('\D+', message.text.strip())) != 0:
+        bot.send_message(message.chat.id, 'Недопустимый формат uid')
+        return 0
+    uid = message.text.strip()
+    user = add_user_in_db(uid)
+    if user == 0:
+        bot.send_message(message.chat.id, 'Такой пользователь уже есть')
+    else:
+        bot.send_message(message.chat.id, 'Готово')
+
+
+@bot.message_handler(commands=['add_akes'])
+def add_akes(message):
+    msg = bot.send_message(message.chat.id,
+                           'Введите uid пользователя и серийный номер АКЭС, к которому надо выдать доступ')
+    bot.register_next_step_handler(msg, add_akes_handler)
+
+
+def add_akes_handler(message):
+    check = True
+    mes = re.findall('\S+', message.text)
+    if len(mes) != 2:
+        check = False
+    for x in [re.findall('\D+', x) for x in mes]:
+        if len(x) > 0:
+            check = False
+            break
+    if not check:
+        bot.send_message(message.chat.id, 'Недопустимый формат uid или серийного номера')
+        return 0
+    uid, sn = re.findall('\d+', message.text)
+    akes = add_user_to_akes(uid, sn)
+    if akes == 0:
+        bot.send_message(message.chat.id, 'У пользователя уже есть достуа к этой АКЭС')
+    if akes == -1:
+        bot.send_message(message.chat.id, 'АКЭС не существует')
+    else:
+        bot.send_message(message.chat.id, 'АКЭС добавлена')
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def query_handler(call):
     if call.data == 'get_grphc_day':
-        answer = service.get_grphc(date='day', data=res_data)
+        data = get_data('day')
+        answer = service.get_grphc(data)
     if call.data == 'get_grphc_week':
-        answer = service.get_grphc(date='week', data=res_data)
+        data = get_data('week')
+        answer = service.get_grphc(data)
     bot.send_photo(call.message.chat.id, answer)
     bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id)
 
