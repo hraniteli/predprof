@@ -1,18 +1,18 @@
 import csv
+from datetime import datetime
 import matplotlib.pyplot as plt
-from providers import *
+from providers import add_data
 
 
 def parse_file(_file, sn, file_name):
-    # _file = _file.split(';')
-    # x = 26
-    # while x < len(_file):
-    #     _file[x] = _file[x][:-20] + '\n' + _file[x][1:] if len(_file) - x != 1 else _file[x]
-    #     x += 26
-    # _file = ';'.join(_file)
+     _file = _file.split(';')
+     x = 26
+     while x < len(_file):
+         _file[x] = _file[x][:-20] + '\n' + _file[x][1:] if len(_file) - x != 1 else _file[x]
+         x += 26
+     _file = ';'.join(_file)
     with open(file_name, 'w') as fd:
         fd.write(_file)
-
     with open(file_name, 'r') as fd:
         reader = csv.reader(fd, delimiter=';')
         for row in reader:
@@ -39,12 +39,37 @@ def calc_efficiency(on, off):
     return efficiency
 
 
+def get_xls(data):
+    res = []
+    for d in data:
+        res.append([
+            d.t_start,
+            d.t_stop,
+            d.cos_a,
+            d.cos_b,
+            d.cos_c,
+            d.p_a,
+            d.p_b,
+            d.p_c,
+            d.q_a,
+            d.q_b,
+            d.q_c,
+            str(d.ef).replace('.', ',') + '%'
+        ])
+    xls_name = datetime.timestamp()
+    with open(f'tmp/xls/{xls_name}.csv', 'w') as f:
+        writer = csv.writer(f, delimiter=';', lineterminator='\n')
+        writer.writerows(res)
+    return xls_name
+
+
 def get_grphc(data):
     efficiency = [x.ef for x in data if x.ef != -1]
     date = [x.t_start for x in data if x.ef != -1]
     plt.grid()
     plt.plot(date, efficiency)
-    plt.savefig('tmp/test.png')
-    with open('tmp/test.png', 'rb') as gr:
+    grphc_name = datetime.timestamp()
+    plt.savefig(f'tmp/grphc_name/{grphc_name}.png')
+    with open(f'tmp/grphc_name/{grphc_name}.png', 'rb') as gr:
         gr = gr.read()
     return gr

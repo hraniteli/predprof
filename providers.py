@@ -1,6 +1,6 @@
-from main import db
-from model import *
 from datetime import datetime
+from main import db
+from model import Data, user_akes, Akes, User
 
 
 def data_wrapper(func):

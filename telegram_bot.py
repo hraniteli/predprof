@@ -1,12 +1,12 @@
+from config import TOKEN
+import csv
+import datetime
+from providers import check_user_exist, check_user_admin, check_akes, add_user_in_db, del_user_from_akes, get_data
+import re
+import service
 import telebot
 from telebot import types
-import service
-import datetime
-from providers import *
-import re
-import csv
-from config import TOKEN
-from pandas import read_csv
+
 
 bot = telebot.TeleBot(TOKEN)
 
@@ -39,6 +39,11 @@ def check_user(func):
     return wrapper
 
 
+@bot.message_handler(commands=['start'])
+def start_message(message):
+    bot.send_message(message.chat.id, "Здравствуйте. Это бот для мониторинг комплекса энергосбережения.")
+
+
 @bot.message_handler(commands=['xls'])
 @check_user
 def get_xls(message):
@@ -58,26 +63,8 @@ def get_xls_by_sn(message):
     if data == 'Нет доступа':
         bot.send_message(message.chat.id, 'У вас не досткпа к этому АКЭС.')
         return 0
-    res = []
-    for d in data:
-        res.append([
-            d.t_start,
-            d.t_stop,
-            d.cos_a,
-            d.cos_b,
-            d.cos_c,
-            d.p_a,
-            d.p_b,
-            d.p_c,
-            d.q_a,
-            d.q_b,
-            d.q_c,
-            str(d.ef).replace('.', ',') + '%'
-        ])
-    with open('tmp/data.csv', 'w') as f:
-        writer = csv.writer(f, delimiter=';', lineterminator='\n')
-        writer.writerows(res)
-    with open('tmp/data.csv', 'r') as fd:
+    xls_name = service.get_xls(data)
+    with open(f'tmp/xls/{xls_name}.csv', 'r') as fd:
         bot.send_document(message.chat.id, fd)
 
 
