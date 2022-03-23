@@ -1,6 +1,6 @@
-from main import db
-from model import *
 from datetime import datetime
+from main import db
+from model import Data, user_akes, Akes, User
 
 
 def data_wrapper(func):
@@ -43,15 +43,16 @@ def add_data(sn, t_start, t_stop, cos_a, cos_b, cos_c, p_a, p_b,
 def get_data(sn, message, date=None):
     if Akes.query.filter_by(sn=sn).first() is None:
         return 'Нет АКЭС'
-    users_akes = User.query.get(message.chat.id).akes
-    if sn in [akes.sn for akes in users_akes]:
+    user = User.query.get(message.chat.id)
+    users_akes = user.akes
+    if sn in [akes.sn for akes in users_akes] or user.admin:
         return Data.query.filter(sn == sn).filter(Data.ef != -1)
     return 'Нет доступа'
 
 
 def check_user_exist(uid):
     if User.query.filter_by(uid=uid).first() is None:
-        return 'Пользователь не найден.'
+        return False
     return True
 
 
@@ -62,9 +63,9 @@ def check_user_admin(uid):
         return False
 
 
-def add_user_in_db(uid):
+def add_user_in_db(uid, admin=False):
     if User.query.filter(User.uid == uid).scalar() is None:
-        user = User(uid=uid, admin=False)
+        user = User(uid=uid, admin=admin)
         db.session.add(user)
         db.session.commit()
     else:
@@ -72,6 +73,8 @@ def add_user_in_db(uid):
 
 
 def add_user_to_akes(uid, sn):
+    if User.query.filter(User.uid == uid).scalar() is None:
+        return 1
     if Akes.query.get(sn) is None:
         return -1
     if sn in [akes.sn for akes in User.query.filter_by(uid=uid).first().akes]:

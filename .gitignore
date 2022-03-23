@@ -1,1 +1,8 @@
 config.py 
+*.pyc
+*~
+__pycache__
+venv
+database.db
+migrations
+.DS_Store

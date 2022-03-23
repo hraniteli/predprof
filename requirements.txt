@@ -1,0 +1,6 @@
+flask
+flask-sqlalchemy
+matplotlib
+pandas
+pyTelegramBotAPI
+DateTime
